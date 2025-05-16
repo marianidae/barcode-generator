@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <title>Генератор на баркодове</title>
+  <script src="https://unpkg.com/bwip-js/dist/bwip-js-min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(#f26334);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 { color: #003366; }
+
+    .logo {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+    }
+
+    input, select, button {
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      margin: 0.5rem;
+      border-radius: 8px;
+      border: 1px solid #aaa;
+    }
+
+    button {
+      background-color: #003366;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+  //  .gen {
+      background-color: #ff7f2a;
+    }
+
+    canvas {
+      margin-top: 2rem;
+      background: white;
+      padding: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    #legend {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #003366;
+      min-height: 40px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Генератор на баркод номера</h1>
+  
+  <!-- ЛОГО -->
+  <div class="logo" onclick="resetForm()" style="cursor: pointer;">
+    <img src="gs1-logo.png" alt="GS1 Bulgaria Logo" style="height: 60px;" id="resetLogo">
+  </div>
+
+  <input type="text" id="barcodeText" placeholder="Въведи стойност" maxlength="64">
+  <select id="barcodeType" onchange="updateLegend()">
+    <option value="ean13">EAN-13</option>
+    <option value="ean8">EAN-8</option>
+    <option value="code128">Code 128</option>
+    <option value="datamatrix">Data Matrix</option>
+    <option value="qrcode">QR Code</option>
+    <option value="databarexpandedstacked">DataBar Expanded Stacked</option>
+  </select>
+  
+  <button class="gen" onclick="generate()">Генерирай</button>
+
+  <div id="legend"></div>
+  <canvas id="barcode" width="300" height="150"></canvas>
+
+  <br>
+  <button onclick="download('png')">Свали PNG</button>
+  <button onclick="download('jpeg')">Свали JPEG</button>
+  <button onclick="downloadSVG()">Свали SVG</button>
+  <button onclick="downloadEPS()">Свали EPS</button>
+
+  <script>
+    function updateLegend() {
+      const type = document.getElementById('barcodeType').value;
+      const legendDiv = document.getElementById('legend');
+      if (type === 'code128') {
+        legendDiv.innerHTML = 'Пример за GS1-128: <code>(01)12345678901231(10)ABC123</code>';
+      } else if (type === 'databarexpandedstacked') {
+        legendDiv.innerHTML = 'Пример за DataBar Expanded Stacked: <code>(01)12345678901231(10)ABC123</code>';
+      } else if (type === 'datamatrix') {
+        legendDiv.innerHTML = 'Пример: <code>ABC123XYZ</code>';
+      } else if (type === 'qrcode') {
+        legendDiv.innerHTML = 'Пример: <code>https://example.com</code>';
+      } else {
+        legendDiv.innerHTML = '';
+      }
+    }
+
+    function generate() {
+      const text = document.getElementById('barcodeText').value.trim();
+      const type = document.getElementById('barcodeType').value;
+      const canvas = document.getElementById('barcode');
+      if (!text) {
+        alert("Моля, въведи стойност.");
+        return;
+      }
+
+      let canvasWidth = 300;
+      let canvasHeight = 150;
+      if (type === 'ean13') { canvasWidth = 150; canvasHeight = 100; }
+      if (type === 'ean8') { canvasWidth = 110; canvasHeight = 85; }
+      if (type === 'databarexpandedstacked') { canvasWidth = 320; canvasHeight = 100; }
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+
+       let options = {
+    	bcid: type,
+    	text: text,
+    	includetext: true,
+    	textfont: 'OCR-B',
+    	textsize: 10,
+    	scaleX: 2.4,
+    	scaleY: 2.4,
+    	paddingwidth: 20,
+    	paddingheight: 10,
+    	backgroundcolor: 'FFFFFF'
+  	};
+
+      if (type === 'databarexpandedstacked') {
+    	  options.segments = 4;  // Разделяне на 4 реда (може да се настрои)
+  	}
+
+      try {
+        bwipjs.toCanvas(canvas, {
+  	bcid: type,
+  	text: text,
+  	includetext: true,
+  	textfont: 'OCR-B',  // важен за GS1
+  	textsize: 12,
+  	scaleX: 2.8,
+  	scaleY: 2.8,
+  	paddingwidth: 20,  // повече отстъп отстрани
+  	paddingheight: 10,
+  	backgroundcolor: 'FFFFFF',
+  	guardwhitespace: true,  // добавя quiet zones и разделители
+  	includeguardwhitespace: true,
+	});
+      } catch (e) {
+        alert("Грешка при генериране: " + e.message);
+      }
+    }
+
+    function download(format) {
+      const canvas = document.getElementById('barcode');
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/' + format);
+      link.download = 'barcode.' + format;
+      link.click();
+    }
+
+    function downloadSVG() {
+      const text = document.getElementById('barcodeText').value.trim();
+      const type = document.getElementById('barcodeType').value;
+      if (!text) {
+        alert("Моля, въведи стойност.");
+        return;
+      }
+
+      try {
+        const svg = bwipjs.toSVG({
+          bcid: type,
+          text: text,
+          scaleX: 3,
+          scaleY: 3,
+          includetext: ['ean13', 'ean8', 'code128', 'databaromni'].includes(type),
+          textxalign: 'center',
+          textfont: 'OCR-B',
+          textsize: 10,
+          paddingwidth: 12,
+          paddingheight: 10,
+          backgroundcolor: 'FFFFFF',
+          mono: true
+        });
+
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'barcode.svg';
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert("Грешка при създаване на SVG: " + e.message);
+      }
+    }
+
+    function downloadEPS() {
+      const text = document.getElementById('barcodeText').value.trim();
+      const type = document.getElementById('barcodeType').value;
+      if (!text) {
+        alert("Моля, въведи стойност.");
+        return;
+      }
+
+      try {
+        const svg = bwipjs.toSVG({
+          bcid: type,
+          text: text,
+          scaleX: 3,
+          scaleY: 3,
+          includetext: ['ean13', 'ean8', 'code128', 'databaromni'].includes(type),
+          textxalign: 'center',
+          textfont: 'OCR-B',
+          textsize: 10,
+          paddingwidth: 12,
+          paddingheight: 10,
+          backgroundcolor: 'FFFFFF',
+          mono: true
+        });
+
+        const blob = new Blob([svg], { type: 'application/postscript' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'barcode.eps';
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert("Грешка при създаване на EPS: " + e.message);
+      }
+
+     function resetForm() {
+  		document.getElementById('barcodeText').value = '';
+  		document.getElementById('barcodeType').value = 'ean13';
+  		document.getElementById('legend').innerHTML = '';
+
+  		const canvas = document.getElementById('barcode');
+  		const ctx = canvas.getContext('2d');
+  		ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+    }
+  </script>
+</body>
+</html>
